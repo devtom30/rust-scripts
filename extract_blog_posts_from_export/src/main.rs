@@ -32,6 +32,9 @@ fn main() {
         "/home/tom/.config/JetBrains/RustRover2024.1/scratches/scratch_2.xml")
         .expect("unable to open file for read")
         .lines() {
+        let line = line.replace("<![CDATA[", "");
+        let line = line.replace("]]>", "");
+        let line = line.as_str();
         if post_open {
             vec_current_post.push(line.parse().unwrap());
             if re_post_closure.is_match(line) {
