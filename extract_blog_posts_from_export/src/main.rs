@@ -6,7 +6,7 @@ use std::io::{BufWriter, Write};
 use regex::Regex;
 
 fn main() {
-    let out_directory = "out";
+    let out_directory = create_out_directory();
 
     let str_to_convert = String::from("GIORNO 3 - gioved&#xEC; 5 febbraio : PISA !!!");
     let new_str = convert_special_chars_in_str(&str_to_convert);
@@ -60,7 +60,7 @@ fn main() {
                 vec_current_post.push(line.parse().unwrap());
 
                 if let Some(caps) = re_post_aperture_publish_date.captures(line) {
-                    date_path = out_directory.to_string();
+                    date_path = out_directory.clone();
                     date_path.push('/');
                     date_path.push_str(caps.get(1).expect("can't extract year").as_str());
                     date_path.push('/');
@@ -150,4 +150,17 @@ fn convert_utf8_code_to_char(raw: &String) -> Option<char> {
     println!("converting cleaned {}", without_prefix);
     let z = i64::from_str_radix(without_prefix, 16);
     char::from_u32(z.unwrap() as u32)
+}
+
+fn create_out_directory() -> String {
+    let dir_name = String::from("out_")
+        + chrono::offset::Local::now()
+        .to_string().
+        split('.')
+        .next()
+        .expect("chrono local now")
+        .replace(" ", "_")
+        .as_str();
+    create_dir(&dir_name).expect("create dir");
+    dir_name
 }
