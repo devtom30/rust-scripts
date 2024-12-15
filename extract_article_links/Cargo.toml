@@ -1,0 +1,8 @@
+[package]
+name = "extract_article_links"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utf8-chars = "3.0.5"
+regex = "1.11.1"
