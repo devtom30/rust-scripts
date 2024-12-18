@@ -18,6 +18,8 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     let pattern = &args[1];
+    let download = args.get(2).map_or_else(|| false, |arg| true);
+    println!("{}", download);
 
     let properties: AppProperties = AppProperties::new();
     let path = properties.get("path");
@@ -25,7 +27,8 @@ fn main() {
     let exclusions_str = properties.get("exclusions");
     let exclusion_map = extract_exclusions(exclusions_str);
 
-    search_pattern_at_path(Path::new(path), pattern, &filename_pattern.to_string(), &exclusion_map);
+    search_pattern_at_path(Path::new(path), pattern, &filename_pattern.to_string(), &exclusion_map,
+    download);
 }
 
 struct SearchResult {
@@ -47,15 +50,17 @@ fn extract_exclusions(value: &str) -> HashMap<String, Vec<String>> {
 }
 
 fn search_pattern_at_path(path: &Path, pattern: &String, filename_pattern: &String,
-                          exclusion_patterns: &HashMap<String, Vec<String>>) -> Vec<SearchResult> {
+                          exclusion_patterns: &HashMap<String, Vec<String>>,
+                          download: bool) -> Vec<SearchResult> {
     let mut results = vec!();
     search_in_dir(&mut results, pattern, path.to_string_lossy().to_string(), &filename_pattern,
-                  exclusion_patterns);
+                  exclusion_patterns, download);
     results
 }
 
 fn search_in_dir(results: &mut Vec<SearchResult>, pattern: &String, current_dir: String,
-                 filename_pattern: &String, exclusion_patterns: &HashMap<String, Vec<String>>) {
+                 filename_pattern: &String, exclusion_patterns: &HashMap<String, Vec<String>>,
+                 download: bool) {
     let matcher = RegexMatcher::new(pattern.to_lowercase().as_str()).expect("regex");
 
     let mut exclusion_regex_matchers: Vec<Regex> = vec!();
@@ -68,7 +73,6 @@ fn search_in_dir(results: &mut Vec<SearchResult>, pattern: &String, current_dir:
                 Regex::new(exclusion_pattern).expect("exclusion pattern matcher build")
             }).collect();
     }
-
 
     let mut nb = 0;
     for entry in WalkDir::new(current_dir.clone())
@@ -83,14 +87,55 @@ fn search_in_dir(results: &mut Vec<SearchResult>, pattern: &String, current_dir:
         nb += 1;
         println!("{} search {} in file {}", nb, pattern, entry.path().to_string_lossy().to_string());
         let lines = search_in_file(&matcher, entry.path(), &exclusion_regex_matchers);
+        println!("found {}", lines.len());
         if !lines.is_empty() {
+            if download {
+                // let's extract links and download them
+                let regexes: Vec<Regex> = to_vec_regex(&vec!(String::from("ekladata")));
+                let exclusion_regexes= to_vec_regex(&vec!(String::from("^https://www.pinterest.com/pin/create")));
+                let links = extract_links(&lines, &regexes, &exclusion_regexes);
+                println!("{:?}", links);
+            }
+
             results.push(SearchResult {
                 path: path,
                 href: rel_path,
                 lines
             });
+
         }
     }
+}
+
+fn to_vec_regex(vec: &Vec<String>) -> Vec<Regex> {
+    vec.iter()
+        .map(|string: &String| Regex::new(string.as_str()))
+        .filter(|result| result.is_ok())
+        .map(|result| result.unwrap())
+        .collect()
+}
+
+fn extract_links(lines: &Vec<String>, regexes: &Vec<Regex>, exclusion_regexes: &Vec<Regex>) -> Vec<String> {
+    let regex_href = Regex::new(r#"href="([^"]+)"#).unwrap();
+    lines.iter()
+        .map(|line| regex_href.captures(line))
+        .filter(|capture_option| capture_option.is_some())
+        .map(|capture_option| capture_option.unwrap())
+        .map(|capture| capture.get(1) )
+        .filter(|match_option| match_option.is_some())
+        .map(|match_option| match_option.unwrap())
+        .filter(|match_item| !match_item.is_empty())
+        .map(|match_item| match_item.as_str().to_string())
+        .filter(|link| match_one_regex(regexes, link) && match_no_regex(exclusion_regexes, link))
+        .collect()
+}
+
+fn match_no_regex(regexes: &Vec<Regex>, subject: &String) -> bool {
+    regexes.iter().find(|regex| regex.is_match(subject)).is_none()
+}
+
+fn match_one_regex(regexes: &Vec<Regex>, subject: &String) -> bool {
+    regexes.iter().find(|regex| regex.is_match(subject)).is_some()
 }
 
 fn make_path_relative(start_path: &String, path_to_shorten: &String) -> String {
