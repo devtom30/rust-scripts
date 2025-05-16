@@ -1,3 +1,3 @@
 [workspace]
 
-members = [ "check_present", "extract_article_links","extract_blog_posts_from_export", "grep", "search_in_files"]
+members = [ "check_present", "download_with_login", "extract_and_download_linked_documents", "extract_article_links","extract_blog_posts_from_export", "grep", "remove_duplicates", "search_in_files"]
